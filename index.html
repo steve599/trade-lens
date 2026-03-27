@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="交易分析">
+<title>交易分析 · Trade Lens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ── Variables ── */
+  :root {
+    --bg:        #080c10;
+    --surface:   #0d1117;
+    --card:      #111820;
+    --border:    #1e2a36;
+    --border2:   #243040;
+    --text:      #c9d5e0;
+    --muted:     #4a5e70;
+    --accent:    #00d4aa;
+    --accent2:   #0099cc;
+    --buy:       #00c87a;
+    --sell:      #ff4455;
+    --hold:      #f0a500;
+    --wait:      #4488ff;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --r:         14px;
+    --safe-top:  env(safe-area-inset-top, 44px);
+    --safe-bot:  env(safe-area-inset-bottom, 20px);
+  }
+
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: -webkit-fill-available; }
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.015) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* ── Layout ── */
+  .app {
+    position: relative; z-index: 1;
+    max-width: 430px; margin: 0 auto;
+    padding: calc(var(--safe-top) + 12px) 16px calc(var(--safe-bot) + 16px);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0;
+  }
+  .logo {
+    font-family: var(--font-head);
+    font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .logo span { font-weight: 400; opacity: 0.5; font-size: 13px;
+               -webkit-text-fill-color: var(--muted); font-family: var(--font-mono); }
+  .key-btn {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 8px 14px;
+    font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .key-btn.has-key { color: var(--accent); border-color: rgba(0,212,170,.3); }
+  .key-btn:active { transform: scale(0.95); }
+
+  /* ── API Key Panel ── */
+  .key-panel {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: var(--r); padding: 16px;
+    display: none; flex-direction: column; gap: 10px;
+    animation: slideDown .25s ease;
+  }
+  .key-panel.open { display: flex; }
+  .key-panel label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .key-panel input {
+    background: var(--bg); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 12px 14px;
+    font-family: var(--font-mono); font-size: 14px; color: var(--text);
+    width: 100%; outline: none; -webkit-appearance: none;
+    transition: border-color .2s;
+  }
+  .key-panel input:focus { border-color: var(--accent); }
+  .key-panel .save-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 10px; padding: 12px;
+    font-family: var(--font-head); font-size: 14px; font-weight: 700;
+    color: #000; cursor: pointer; transition: opacity .2s;
+  }
+  .key-panel .save-btn:active { opacity: 0.8; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    background: var(--card);
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--r);
+    min-height: 200px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; cursor: pointer;
+    transition: all .25s; position: relative; overflow: hidden;
+  }
+  .upload-zone.has-image {
+    border-style: solid; border-color: var(--border);
+    min-height: unset;
+  }
+  .upload-zone:active { transform: scale(0.99); }
+  .upload-zone img {
+    width: 100%; border-radius: calc(var(--r) - 2px);
+    display: block;
+  }
+  .upload-icon {
+    width: 56px; height: 56px; border-radius: 16px;
+    background: rgba(0,212,170,.08);
+    border: 1px solid rgba(0,212,170,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+  }
+  .upload-hint {
+    font-family: var(--font-head); font-size: 15px; font-weight: 600;
+    color: var(--text); text-align: center; line-height: 1.5;
+  }
+  .upload-hint span { display: block; font-family: var(--font-mono);
+    font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 3px; }
+  #file-input { display: none; }
+
+  /* ── Action buttons row ── */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-row.single { grid-template-columns: 1fr; }
+  .action-btn {
+    border: none; border-radius: var(--r); padding: 16px 12px;
+    font-family: var(--font-head); font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .action-btn.camera {
+    background: var(--card); border: 1px solid var(--border2); color: var(--text);
+  }
+  .action-btn.camera:active { background: var(--border2); }
+  .action-btn.analyze {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000;
+  }
+  .action-btn.analyze:disabled {
+    background: var(--border); color: var(--muted); cursor: not-allowed;
+  }
+  .action-btn.analyze:not(:disabled):active { transform: scale(0.97); opacity: .9; }
+  .action-btn .icon { font-size: 20px; }
+
+  /* ── Loading state ── */
+  .loading-card {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: var(--r); padding: 32px 20px;
+    display: none; flex-direction: column;
+    align-items: center; gap: 16px;
+  }
+  .loading-card.show { display: flex; }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text {
+    font-family: var(--font-head); font-size: 15px; font-weight: 600;
+    color: var(--text); text-align: center;
+  }
+  .loading-sub { font-size: 12px; color: var(--muted); text-align: center; }
+
+  /* ── Result card ── */
+  .result-card {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: var(--r); overflow: hidden;
+    display: none; flex-direction: column;
+    animation: slideUp .35s ease;
+  }
+  .result-card.show { display: flex; }
+
+  /* Action header */
+  .result-header {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .action-badge {
+    font-family: var(--font-head); font-size: 28px; font-weight: 800;
+    letter-spacing: -1px;
+  }
+  .action-badge.BUY  { color: var(--buy); }
+  .action-badge.SELL { color: var(--sell); }
+  .action-badge.HOLD { color: var(--hold); }
+  .action-badge.WAIT { color: var(--wait); }
+
+  .conf-pill {
+    font-size: 11px; font-weight: 500; padding: 4px 10px;
+    border-radius: 20px; border: 1px solid;
+  }
+  .conf-pill.HIGH   { color: var(--buy);  border-color: rgba(0,200,122,.4);  background: rgba(0,200,122,.08); }
+  .conf-pill.MEDIUM { color: var(--hold); border-color: rgba(240,165,0,.4);  background: rgba(240,165,0,.08); }
+  .conf-pill.LOW    { color: var(--sell); border-color: rgba(255,68,85,.4);  background: rgba(255,68,85,.08); }
+
+  /* Instrument row */
+  .instrument-row {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .instrument-name {
+    font-family: var(--font-head); font-size: 17px; font-weight: 700; color: var(--text);
+  }
+  .instrument-meta { font-size: 12px; color: var(--muted); }
+
+  /* Price row */
+  .price-row {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+  }
+  .price-cell { display: flex; flex-direction: column; gap: 3px; }
+  .price-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .price-value { font-size: 15px; font-weight: 500; color: var(--text); }
+  .price-value.up   { color: var(--buy); }
+  .price-value.down { color: var(--sell); }
+
+  /* Indicator row */
+  .indicator-row {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .indicator-cell {
+    background: var(--bg); border-radius: 10px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .ind-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .ind-value { font-size: 14px; font-weight: 500; }
+  .ind-value.bull { color: var(--buy); }
+  .ind-value.bear { color: var(--sell); }
+  .ind-value.neut { color: var(--hold); }
+  .ind-signal { font-size: 11px; color: var(--muted); }
+
+  /* Trade details */
+  .trade-grid {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .trade-cell { display: flex; flex-direction: column; gap: 3px; }
+  .trade-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .trade-value { font-size: 14px; font-weight: 500; color: var(--text); }
+  .trade-value.entry { color: var(--accent); }
+  .trade-value.sl    { color: var(--sell); }
+  .trade-value.tp    { color: var(--buy); }
+
+  /* Reasoning */
+  .reasoning-section { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .section-title {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .reasoning-text { font-size: 13px; color: var(--text); line-height: 1.65; }
+
+  /* Key points */
+  .keypoints-section { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .keypoint {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--text); line-height: 1.5;
+  }
+  .keypoint:last-child { border-bottom: none; }
+  .keypoint::before { content: '›'; color: var(--accent); font-size: 16px; flex-shrink: 0; margin-top: -1px; }
+
+  /* Alert banner */
+  .alert-banner {
+    margin: 14px 18px;
+    background: rgba(255,68,85,.08);
+    border: 1px solid rgba(255,68,85,.3);
+    border-left: 3px solid var(--sell);
+    border-radius: 10px; padding: 12px 14px;
+    font-size: 13px; color: var(--sell); line-height: 1.5;
+    display: none;
+  }
+  .alert-banner.buy-alert {
+    background: rgba(0,200,122,.08);
+    border-color: rgba(0,200,122,.3);
+    border-left-color: var(--buy);
+    color: var(--buy);
+  }
+  .alert-banner.show { display: block; }
+  .alert-title { font-family: var(--font-head); font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+
+  /* Trend bar */
+  .trend-row {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .trend-label { font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .trend-track {
+    flex: 1; height: 6px; background: var(--border2); border-radius: 3px; overflow: hidden;
+  }
+  .trend-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .trend-fill.up   { background: linear-gradient(90deg, var(--buy), #00ffaa); }
+  .trend-fill.down { background: linear-gradient(90deg, var(--sell), #ff8899); }
+  .trend-fill.side { background: linear-gradient(90deg, var(--hold), #ffd080); }
+  .trend-tag { font-size: 12px; font-weight: 500; width: 70px; text-align: right; flex-shrink: 0; }
+  .trend-tag.up   { color: var(--buy); }
+  .trend-tag.down { color: var(--sell); }
+  .trend-tag.side { color: var(--hold); }
+
+  /* Ticker strip */
+  .ticker-section { padding: 12px 18px; }
+  .ticker-text { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* Footer timestamp */
+  .result-footer {
+    padding: 10px 18px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-ts { font-size: 11px; color: var(--muted); }
+  .footer-quality { font-size: 11px; }
+  .footer-quality.good { color: var(--buy); }
+  .footer-quality.fair { color: var(--hold); }
+  .footer-quality.poor { color: var(--sell); }
+
+  /* Error card */
+  .error-card {
+    background: rgba(255,68,85,.06);
+    border: 1px solid rgba(255,68,85,.25);
+    border-radius: var(--r); padding: 20px 18px;
+    display: none; flex-direction: column; gap: 8px;
+  }
+  .error-card.show { display: flex; }
+  .error-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; color: var(--sell); }
+  .error-msg   { font-size: 13px; color: var(--text); line-height: 1.5; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: calc(var(--safe-bot) + 20px); left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 10px 20px;
+    font-size: 13px; color: var(--text);
+    opacity: 0; pointer-events: none;
+    transition: opacity .3s; white-space: nowrap; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Animations */
+  @keyframes spin     { to { transform: rotate(360deg); } }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:none; } }
+  @keyframes slideUp   { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+  @keyframes pulse     {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,212,170,0); }
+    50%      { box-shadow: 0 0 0 8px rgba(0,212,170,.12); }
+  }
+  .action-btn.analyze:not(:disabled) { animation: pulse 2.5s infinite; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="logo">Trade Lens <span>AI</span></div>
+    </div>
+    <button class="key-btn" id="keyToggle" onclick="toggleKeyPanel()">
+      <span id="keyIcon">🔑</span>
+      <span id="keyLabel">API Key</span>
+    </button>
+  </div>
+
+  <!-- API Key Panel -->
+  <div class="key-panel" id="keyPanel">
+    <label>Gemini API Key (saved on this device only)</label>
+    <input type="password" id="apiKeyInput" placeholder="AIza…"
+           autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="save-btn" onclick="saveKey()">Save Key</button>
+  </div>
+
+  <!-- Upload Zone -->
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('file-input').click()">
+    <div class="upload-icon">📊</div>
+    <div class="upload-hint">
+      Tap to select chart image
+      <span>Camera · Photos Library</span>
+    </div>
+  </div>
+  <!-- Hidden file input — accepts both camera and library on iOS -->
+  <input type="file" id="file-input" accept="image/*" onchange="handleFile(event)">
+
+  <!-- Camera / Library buttons -->
+  <div class="btn-row" id="captureRow">
+    <button class="action-btn camera" onclick="openCamera()">
+      <span class="icon">📷</span> Camera
+    </button>
+    <button class="action-btn camera" onclick="openLibrary()">
+      <span class="icon">🖼️</span> Library
+    </button>
+  </div>
+
+  <!-- Analyze button (full width, shown after image selected) -->
+  <button class="action-btn analyze" id="analyzeBtn" disabled onclick="analyze()">
+    <span class="icon">🔍</span> Analyze Chart
+  </button>
+
+  <!-- Loading -->
+  <div class="loading-card" id="loadingCard">
+    <div class="spinner"></div>
+    <div class="loading-text">Analyzing chart…</div>
+    <div class="loading-sub">Gemini is reading the Simplified Chinese data</div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-card" id="resultCard"></div>
+
+  <!-- Error -->
+  <div class="error-card" id="errorCard">
+    <div class="error-title">Analysis Failed</div>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+
+</div><!-- /.app -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Hidden inputs for camera vs library -->
+<input type="file" id="camera-input"  accept="image/*" capture="environment" onchange="handleFile(event)" style="display:none">
+<input type="file" id="library-input" accept="image/*" onchange="handleFile(event)" style="display:none">
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let selectedImageB64 = null;
+let selectedMime     = 'image/jpeg';
+
+// ── API Key ────────────────────────────────────────────────────────
+function loadKey() {
+  return localStorage.getItem('gemini_key') || '';
+}
+
+function saveKey() {
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if (!k) { showToast('Please enter your API key'); return; }
+  localStorage.setItem('gemini_key', k);
+  updateKeyUI(k);
+  document.getElementById('keyPanel').classList.remove('open');
+  showToast('✅ API key saved');
+}
+
+function updateKeyUI(key) {
+  const btn   = document.getElementById('keyToggle');
+  const icon  = document.getElementById('keyIcon');
+  const label = document.getElementById('keyLabel');
+  if (key) {
+    btn.classList.add('has-key');
+    icon.textContent  = '✅';
+    label.textContent = '…' + key.slice(-6);
+  } else {
+    btn.classList.remove('has-key');
+    icon.textContent  = '🔑';
+    label.textContent = 'API Key';
+  }
+}
+
+function toggleKeyPanel() {
+  const panel = document.getElementById('keyPanel');
+  const isOpen = panel.classList.toggle('open');
+  if (isOpen) {
+    document.getElementById('apiKeyInput').value = loadKey();
+    setTimeout(() => document.getElementById('apiKeyInput').focus(), 100);
+  }
+}
+
+// ── File handling ──────────────────────────────────────────────────
+function openCamera()  { document.getElementById('camera-input').click(); }
+function openLibrary() { document.getElementById('library-input').click(); }
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';   // reset so same file can be re-selected
+
+  selectedMime = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const dataUrl = ev.target.result;
+    selectedImageB64 = dataUrl.split(',')[1];
+
+    // Show preview
+    const zone = document.getElementById('uploadZone');
+    zone.innerHTML = `<img src="${dataUrl}" alt="Chart preview">`;
+    zone.classList.add('has-image');
+    zone.onclick = null;   // disable click-to-replace on preview
+
+    // Enable analyze
+    document.getElementById('analyzeBtn').disabled = false;
+
+    // Clear old results
+    hide('resultCard'); hide('errorCard'); hide('loadingCard');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Analysis ───────────────────────────────────────────────────────
+const PROMPT = `你是一位专业的金融分析师，专注于中国股票、期货和金融市场。
+请分析这张中文券商图表截图（包含简体中文标签、K线图、RSI、MACD及行情数据）。
+
+请用英文返回以下JSON对象，不要任何Markdown格式或额外文字：
+
+{
+  "subject": {
+    "name": "股票/品种名称（中文或拼音）",
+    "code": "代码如600519，若不可见则为null",
+    "type": "stock / futures / index / forex / other"
+  },
+  "timeframe": {
+    "chart_period": "如 日K / 周K / 60分钟K",
+    "days_covered": 30,
+    "trend_direction": "uptrend / downtrend / sideways / unclear"
+  },
+  "price": {
+    "current": 123.45,
+    "change_pct": "+1.23%",
+    "support": 120.00,
+    "resistance": 130.00
+  },
+  "rsi": {
+    "value": 65.2,
+    "zone": "overbought / oversold / neutral",
+    "signal": "buy / sell / neutral"
+  },
+  "macd": {
+    "crossover": "golden_cross / death_cross / none / unclear",
+    "histogram_trend": "expanding / shrinking / flat",
+    "signal": "buy / sell / neutral"
+  },
+  "key_observations": [
+    "Observation 1 in English",
+    "Observation 2 in English"
+  ],
+  "strategy": {
+    "action": "BUY / SELL / HOLD / WAIT",
+    "confidence": "HIGH / MEDIUM / LOW",
+    "entry_price_range": "如 121.50–123.00",
+    "stop_loss": "如 118.00",
+    "take_profit": "如 135.00",
+    "holding_period": "如 3–5 trading days",
+    "reasoning": "2–3句完整的英文理由"
+  },
+  "alert": {
+    "open_now": false,
+    "close_now": false,
+    "urgency": "IMMEDIATE / TODAY / SOON / NONE",
+    "message": "简洁的操作提示"
+  },
+  "image_quality": "good / fair / poor"
+}
+
+若某字段不可见或无法判断，请填null。仅返回JSON，不要其他内容。`;
+
+async function analyze() {
+  const key = loadKey();
+  if (!key) {
+    showToast('⚠️ Please save your Gemini API key first');
+    toggleKeyPanel();
+    return;
+  }
+  if (!selectedImageB64) {
+    showToast('Please select a chart image first');
+    return;
+  }
+
+  show('loadingCard'); hide('resultCard'); hide('errorCard');
+  document.getElementById('analyzeBtn').disabled = true;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+    const body = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: selectedMime, data: selectedImageB64 } },
+          { text: PROMPT }
+        ]
+      }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1500 }
+    };
+
+    const res  = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const json = await res.json();
+
+    if (!res.ok) {
+      const msg = json?.error?.message || `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+
+    let raw = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    raw = raw.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(raw);
+
+    renderResult(data);
+    hide('loadingCard');
+    show('resultCard');
+
+  } catch (err) {
+    hide('loadingCard');
+    let msg = err.message || String(err);
+    if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
+      msg = 'Invalid Gemini API key. Check aistudio.google.com';
+    } else if (msg.includes('JSON')) {
+      msg = 'Gemini returned an unexpected response. Please try again.';
+    }
+    document.getElementById('errorMsg').textContent = msg;
+    show('errorCard');
+  }
+
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+// ── Render ─────────────────────────────────────────────────────────
+function renderResult(d) {
+  const sub   = d.subject   || {};
+  const tf    = d.timeframe || {};
+  const pr    = d.price     || {};
+  const rsi   = d.rsi       || {};
+  const macd  = d.macd      || {};
+  const strat = d.strategy  || {};
+  const alrt  = d.alert     || {};
+  const obs   = d.key_observations || [];
+
+  const action = (strat.action || 'WAIT').toUpperCase();
+  const conf   = (strat.confidence || '—').toUpperCase();
+  const trend  = (tf.trend_direction || 'unclear').toLowerCase();
+
+  const trendMap = {
+    uptrend:  { cls:'up',   pct:80, label:'Uptrend ↑' },
+    downtrend:{ cls:'down', pct:80, label:'Downtrend ↓' },
+    sideways: { cls:'side', pct:50, label:'Sideways →' },
+    unclear:  { cls:'side', pct:30, label:'Unclear' }
+  };
+  const t = trendMap[trend] || trendMap.unclear;
+
+  const rsiClass  = { buy:'bull', sell:'bear', neutral:'neut' }[rsi.signal] || 'neut';
+  const macdClass = { buy:'bull', sell:'bear', neutral:'neut' }[macd.signal] || 'neut';
+  const chgClass  = pr.change_pct?.startsWith('-') ? 'down' : 'up';
+  const qCls      = d.image_quality || 'fair';
+
+  const alertHTML = (() => {
+    if (alrt.open_now || alrt.close_now || alrt.urgency === 'IMMEDIATE') {
+      const isBuy = alrt.open_now;
+      return `<div class="alert-banner ${isBuy ? 'buy-alert' : ''} show">
+        <div class="alert-title">${isBuy ? '🚀 Open Position' : '⚠️ Close Position'}</div>
+        ${esc(alrt.message || '')}
+      </div>`;
+    }
+    return '';
+  })();
+
+  const obsHTML = obs.slice(0,5).map(o =>
+    `<div class="keypoint">${esc(o)}</div>`
+  ).join('');
+
+  const tickerHTML = d.ticker_content
+    ? `<div class="ticker-section">
+         <div class="section-title">Ticker</div>
+         <div class="ticker-text">${esc(d.ticker_content)}</div>
+       </div>`
+    : '';
+
+  document.getElementById('resultCard').innerHTML = `
+    <!-- Action header -->
+    <div class="result-header">
+      <div class="action-badge ${action}">${action}</div>
+      <div class="conf-pill ${conf}">${conf} confidence</div>
+    </div>
+
+    <!-- Instrument -->
+    <div class="instrument-row">
+      <div class="instrument-name">${esc(sub.name || '—')}</div>
+      <div class="instrument-meta">
+        ${sub.code ? esc(sub.code) + ' · ' : ''}${esc(sub.type || '')}
+        ${tf.chart_period ? ' · ' + esc(tf.chart_period) : ''}
+        ${tf.days_covered ? ' · ' + tf.days_covered + 'd' : ''}
+      </div>
+    </div>
+
+    <!-- Trend bar -->
+    <div class="trend-row">
+      <div class="trend-label">Trend</div>
+      <div class="trend-track">
+        <div class="trend-fill ${t.cls}" style="width:${t.pct}%"></div>
+      </div>
+      <div class="trend-tag ${t.cls}">${t.label}</div>
+    </div>
+
+    <!-- Price -->
+    <div class="price-row">
+      <div class="price-cell">
+        <div class="price-label">Price</div>
+        <div class="price-value">${pr.current ?? '—'}</div>
+      </div>
+      <div class="price-cell">
+        <div class="price-label">Change</div>
+        <div class="price-value ${chgClass}">${esc(pr.change_pct || '—')}</div>
+      </div>
+      <div class="price-cell">
+        <div class="price-label">Support / Resist</div>
+        <div class="price-value" style="font-size:12px">
+          ${pr.support ?? '—'} / ${pr.resistance ?? '—'}
+        </div>
+      </div>
+    </div>
+
+    <!-- Indicators -->
+    <div class="indicator-row">
+      <div class="indicator-cell">
+        <div class="ind-label">RSI</div>
+        <div class="ind-value ${rsiClass}">
+          ${rsi.value != null ? rsi.value.toFixed(1) : '—'}
+          <span style="font-size:11px">(${esc(rsi.zone || '—')})</span>
+        </div>
+        <div class="ind-signal">Signal: ${esc(rsi.signal || '—')}</div>
+      </div>
+      <div class="indicator-cell">
+        <div class="ind-label">MACD</div>
+        <div class="ind-value ${macdClass}">${esc(macd.crossover || '—')}</div>
+        <div class="ind-signal">${esc(macd.histogram_trend || '—')} · ${esc(macd.signal || '—')}</div>
+      </div>
+    </div>
+
+    <!-- Trade levels -->
+    <div class="trade-grid">
+      <div class="trade-cell">
+        <div class="trade-label">Entry Range</div>
+        <div class="trade-value entry">${esc(strat.entry_price_range || '—')}</div>
+      </div>
+      <div class="trade-cell">
+        <div class="trade-label">Holding Period</div>
+        <div class="trade-value">${esc(strat.holding_period || '—')}</div>
+      </div>
+      <div class="trade-cell">
+        <div class="trade-label">Stop Loss</div>
+        <div class="trade-value sl">${esc(strat.stop_loss || '—')}</div>
+      </div>
+      <div class="trade-cell">
+        <div class="trade-label">Take Profit</div>
+        <div class="trade-value tp">${esc(strat.take_profit || '—')}</div>
+      </div>
+    </div>
+
+    <!-- Alert banner -->
+    ${alertHTML}
+
+    <!-- Reasoning -->
+    <div class="reasoning-section">
+      <div class="section-title">Strategy Reasoning</div>
+      <div class="reasoning-text">${esc(strat.reasoning || '—')}</div>
+    </div>
+
+    <!-- Key observations -->
+    ${obs.length ? `
+    <div class="keypoints-section">
+      <div class="section-title">Key Observations</div>
+      ${obsHTML}
+    </div>` : ''}
+
+    ${tickerHTML}
+
+    <!-- Footer -->
+    <div class="result-footer">
+      <div class="footer-ts">${new Date().toLocaleTimeString()}</div>
+      <div class="footer-quality ${qCls}">Image: ${qCls}</div>
+    </div>
+  `;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+function show(id) { document.getElementById(id).classList.add('show'); }
+function hide(id) { document.getElementById(id).classList.remove('show'); }
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+(function init() {
+  const k = loadKey();
+  if (k) updateKeyUI(k);
+})();
+</script>
+</body>
+</html>
