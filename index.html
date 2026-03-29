@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="交易分析">
+<title>交易分析 · Trade Lens</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080c10; --surface:#0d1117; --card:#111820; --border:#1e2a36; --border2:#243040;
+  --text:#c9d5e0; --muted:#4a5e70; --accent:#00d4aa; --accent2:#0099cc;
+  --buy:#00c87a; --sell:#ff4455; --hold:#f0a500; --wait:#4488ff;
+  --font-head:'Syne',sans-serif; --font-mono:'DM Mono',monospace; --r:14px;
+  --safe-top:env(safe-area-inset-top,44px); --safe-bot:env(safe-area-inset-bottom,20px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:-webkit-fill-available;}
+body{min-height:100vh;min-height:-webkit-fill-available;background:var(--bg);color:var(--text);
+  font-family:var(--font-mono);font-size:14px;-webkit-font-smoothing:antialiased;
+  overscroll-behavior:none;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,212,170,.015) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(0,212,170,.015) 1px,transparent 1px);background-size:32px 32px;}
+.app{position:relative;z-index:1;max-width:430px;margin:0 auto;
+  padding:calc(var(--safe-top) + 12px) 16px calc(var(--safe-bot) + 80px);
+  display:flex;flex-direction:column;gap:16px;}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:4px 0;}
+.logo{font-family:var(--font-head);font-size:22px;font-weight:800;letter-spacing:-.5px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.logo span{font-weight:400;font-size:13px;-webkit-text-fill-color:var(--muted);font-family:var(--font-mono);}
+.key-btn{background:var(--card);border:1px solid var(--border2);border-radius:10px;
+  padding:8px 14px;font-family:var(--font-mono);font-size:12px;color:var(--muted);
+  cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;}
+.key-btn.has-key{color:var(--accent);border-color:rgba(0,212,170,.3);}
+.key-btn:active{transform:scale(.95);}
+
+/* Key panel */
+.key-panel{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  padding:16px;display:none;flex-direction:column;gap:10px;animation:slideDown .25s ease;}
+.key-panel.open{display:flex;}
+.key-panel label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.key-panel input{background:var(--bg);border:1px solid var(--border2);border-radius:10px;
+  padding:12px 14px;font-family:var(--font-mono);font-size:14px;color:var(--text);
+  width:100%;outline:none;-webkit-appearance:none;transition:border-color .2s;}
+.key-panel input:focus{border-color:var(--accent);}
+.key-hint{font-size:11px;color:var(--muted);line-height:1.5;}
+.key-hint a{color:var(--accent);text-decoration:none;}
+.save-btn{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;
+  border-radius:10px;padding:12px;font-family:var(--font-head);font-size:14px;
+  font-weight:700;color:#000;cursor:pointer;}
+.save-btn:active{opacity:.8;}
+
+/* Tabs */
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--card);
+  border:1px solid var(--border2);border-radius:var(--r);padding:4px;gap:4px;}
+.tab-btn{border:none;border-radius:10px;padding:10px;font-family:var(--font-head);
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+  background:transparent;color:var(--muted);}
+.tab-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+
+/* Upload zone */
+.upload-zone{background:var(--card);border:1.5px dashed var(--border2);border-radius:var(--r);
+  min-height:160px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;cursor:pointer;transition:all .25s;overflow:hidden;}
+.upload-zone.has-image{border-style:solid;border-color:var(--border);min-height:unset;}
+.upload-zone:active{transform:scale(.99);}
+.upload-zone img{width:100%;border-radius:calc(var(--r) - 2px);display:block;}
+.upload-icon{width:48px;height:48px;border-radius:14px;background:rgba(0,212,170,.08);
+  border:1px solid rgba(0,212,170,.2);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.upload-hint{font-family:var(--font-head);font-size:14px;font-weight:600;color:var(--text);text-align:center;line-height:1.5;}
+.upload-hint span{display:block;font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;}
+
+/* Multi-select queue */
+.queue-header{display:flex;align-items:center;justify-content:space-between;}
+.queue-title{font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text);}
+.queue-count{font-size:12px;color:var(--accent);}
+.queue-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;}
+.queue-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border2);}
+.queue-thumb img{width:100%;height:100%;object-fit:cover;}
+.queue-thumb .q-status{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-size:18px;background:rgba(8,12,16,.6);}
+.queue-thumb .q-status.done{background:rgba(0,200,122,.15);}
+.queue-thumb .q-status.active{background:rgba(0,153,204,.15);}
+.queue-thumb .q-status.error{background:rgba(255,68,85,.15);}
+.queue-thumb .q-num{position:absolute;top:3px;left:4px;font-size:9px;
+  color:#fff;background:rgba(0,0,0,.6);border-radius:4px;padding:1px 4px;}
+
+/* Progress bar */
+.progress-bar{background:var(--border2);border-radius:4px;height:6px;overflow:hidden;margin-top:4px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:4px;transition:width .4s ease;width:0%;}
+.progress-label{font-size:11px;color:var(--muted);margin-top:4px;text-align:center;}
+
+/* Buttons */
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.action-btn{border:none;border-radius:var(--r);padding:15px 12px;font-family:var(--font-head);
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:8px;}
+.action-btn.camera{background:var(--card);border:1px solid var(--border2);color:var(--text);}
+.action-btn.camera:active{background:var(--border2);}
+.action-btn.analyze{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+.action-btn.analyze:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;animation:none;}
+.action-btn.analyze:not(:disabled):active{transform:scale(.97);opacity:.9;}
+.action-btn.analyze:not(:disabled){animation:pulse 2.5s infinite;}
+.action-btn .icon{font-size:18px;}
+
+/* Single result */
+.result-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  overflow:hidden;display:none;flex-direction:column;animation:slideUp .35s ease;}
+.result-card.show{display:flex;}
+.result-header{padding:18px 18px 14px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.action-badge{font-family:var(--font-head);font-size:26px;font-weight:800;letter-spacing:-1px;}
+.action-badge.BUY{color:var(--buy);} .action-badge.SELL{color:var(--sell);}
+.action-badge.HOLD{color:var(--hold);} .action-badge.WAIT{color:var(--wait);}
+.conf-pill{font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;border:1px solid;}
+.conf-pill.HIGH{color:var(--buy);border-color:rgba(0,200,122,.4);background:rgba(0,200,122,.08);}
+.conf-pill.MEDIUM{color:var(--hold);border-color:rgba(240,165,0,.4);background:rgba(240,165,0,.08);}
+.conf-pill.LOW{color:var(--sell);border-color:rgba(255,68,85,.4);background:rgba(255,68,85,.08);}
+.instrument-row{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:10px;}
+.instrument-name{font-family:var(--font-head);font-size:16px;font-weight:700;color:var(--text);}
+.instrument-meta{font-size:11px;color:var(--muted);}
+.trend-row{padding:10px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.trend-label{font-size:11px;color:var(--muted);width:70px;flex-shrink:0;}
+.trend-track{flex:1;height:5px;background:var(--border2);border-radius:3px;overflow:hidden;}
+.trend-fill{height:100%;border-radius:3px;transition:width .6s ease;}
+.trend-fill.up{background:linear-gradient(90deg,var(--buy),#00ffaa);}
+.trend-fill.down{background:linear-gradient(90deg,var(--sell),#ff8899);}
+.trend-fill.side{background:linear-gradient(90deg,var(--hold),#ffd080);}
+.trend-tag{font-size:11px;font-weight:500;width:70px;text-align:right;flex-shrink:0;}
+.trend-tag.up{color:var(--buy);} .trend-tag.down{color:var(--sell);} .trend-tag.side{color:var(--hold);}
+.price-row{padding:10px 18px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.price-cell{display:flex;flex-direction:column;gap:2px;}
+.price-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;}
+.price-value{font-size:14px;font-weight:500;color:var(--text);}
+.price-value.up{color:var(--buy);} .price-value.down{color:var(--sell);}
+.indicator-row{padding:10px 18px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.indicator-cell{background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;}
+.ind-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;}
+.ind-value{font-size:13px;font-weight:500;}
+.ind-value.bull{color:var(--buy);} .ind-value.bear{color:var(--sell);} .ind-value.neut{color:var(--hold);}
+.ind-signal{font-size:11px;color:var(--muted);}
+.trade-grid{padding:12px 18px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.trade-cell{display:flex;flex-direction:column;gap:2px;}
+.trade-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;}
+.trade-value{font-size:13px;font-weight:500;color:var(--text);}
+.trade-value.entry{color:var(--accent);} .trade-value.sl{color:var(--sell);} .trade-value.tp{color:var(--buy);}
+.reasoning-section{padding:12px 18px;border-bottom:1px solid var(--border);}
+.section-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.reasoning-text{font-size:13px;color:var(--text);line-height:1.65;}
+.keypoints-section{padding:12px 18px;border-bottom:1px solid var(--border);}
+.keypoint{display:flex;gap:8px;align-items:flex-start;padding:5px 0;
+  border-bottom:1px solid var(--border);font-size:12px;color:var(--text);line-height:1.5;}
+.keypoint:last-child{border-bottom:none;}
+.keypoint::before{content:'›';color:var(--accent);font-size:15px;flex-shrink:0;margin-top:-1px;}
+.alert-banner{margin:12px 18px;background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.3);
+  border-left:3px solid var(--sell);border-radius:10px;padding:11px 13px;
+  font-size:12px;color:var(--sell);line-height:1.5;display:none;}
+.alert-banner.buy-alert{background:rgba(0,200,122,.08);border-color:rgba(0,200,122,.3);border-left-color:var(--buy);color:var(--buy);}
+.alert-banner.show{display:block;}
+.alert-title{font-family:var(--font-head);font-weight:700;font-size:13px;margin-bottom:3px;}
+.result-footer{padding:8px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.footer-ts{font-size:11px;color:var(--muted);}
+.footer-quality{font-size:11px;}
+.footer-quality.good{color:var(--buy);} .footer-quality.fair{color:var(--hold);} .footer-quality.poor{color:var(--sell);}
+
+/* Report card */
+.report-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  overflow:hidden;display:none;flex-direction:column;}
+.report-card.show{display:flex;}
+.report-header{padding:16px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.report-title{font-family:var(--font-head);font-size:17px;font-weight:800;color:var(--accent);}
+.report-date{font-size:11px;color:var(--muted);}
+.report-group{border-bottom:1px solid var(--border);}
+.report-group-title{padding:10px 18px;font-family:var(--font-head);font-size:12px;font-weight:700;
+  color:var(--muted);text-transform:uppercase;letter-spacing:1px;background:rgba(0,0,0,.2);}
+.report-row{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+.report-row:last-child{border-bottom:none;}
+.rr-top{display:flex;align-items:center;justify-content:space-between;}
+.rr-name{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--text);}
+.rr-gap{font-size:12px;color:var(--accent);font-weight:500;}
+.rr-badges{display:flex;gap:6px;flex-wrap:wrap;}
+.rr-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;}
+.rr-badge.BUY{background:rgba(0,200,122,.15);color:var(--buy);}
+.rr-badge.SELL{background:rgba(255,68,85,.15);color:var(--sell);}
+.rr-badge.HOLD{background:rgba(240,165,0,.15);color:var(--hold);}
+.rr-badge.WAIT{background:rgba(68,136,255,.15);color:var(--wait);}
+.rr-badge.HIGH{background:rgba(0,200,122,.1);color:var(--buy);}
+.rr-badge.MEDIUM{background:rgba(240,165,0,.1);color:var(--hold);}
+.rr-badge.LOW{background:rgba(255,68,85,.1);color:var(--sell);}
+.rr-levels{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.rr-level{display:flex;flex-direction:column;gap:1px;}
+.rr-level-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.rr-level-val{font-size:12px;font-weight:500;}
+.rr-level-val.entry{color:var(--accent);} .rr-level-val.sl{color:var(--sell);} .rr-level-val.tp{color:var(--buy);}
+.rr-reasoning{font-size:12px;color:var(--muted);line-height:1.55;}
+.report-save-btn{margin:14px 18px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none;border-radius:10px;padding:14px;font-family:var(--font-head);font-size:14px;
+  font-weight:700;color:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.report-save-btn:active{opacity:.8;}
+
+/* Loading */
+.loading-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  padding:28px 20px;display:none;flex-direction:column;align-items:center;gap:14px;}
+.loading-card.show{display:flex;}
+.spinner{width:40px;height:40px;border:2px solid var(--border2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite;}
+.loading-text{font-family:var(--font-head);font-size:14px;font-weight:600;color:var(--text);text-align:center;}
+.loading-sub{font-size:12px;color:var(--muted);text-align:center;}
+
+/* Error */
+.error-card{background:rgba(255,68,85,.06);border:1px solid rgba(255,68,85,.25);
+  border-radius:var(--r);padding:18px;display:none;flex-direction:column;gap:6px;}
+.error-card.show{display:flex;}
+.error-title{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--sell);}
+.error-msg{font-size:12px;color:var(--text);line-height:1.5;}
+.error-hint{font-size:11px;color:var(--muted);line-height:1.5;}
+
+/* Toast */
+.toast{position:fixed;bottom:calc(var(--safe-bot) + 20px);left:50%;transform:translateX(-50%);
+  background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:10px 20px;
+  font-size:13px;color:var(--text);opacity:0;pointer-events:none;
+  transition:opacity .3s;white-space:nowrap;z-index:100;}
+.toast.show{opacity:1;}
+
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,212,170,0);}50%{box-shadow:0 0 0 8px rgba(0,212,170,.12);}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">Trade Lens <span>AI</span></div>
+    <button class="key-btn" id="keyToggle" onclick="toggleKeyPanel()">
+      <span id="keyIcon">🔑</span><span id="keyLabel">API Key</span>
+    </button>
+  </div>
+
+  <!-- API Key Panel -->
+  <div class="key-panel" id="keyPanel">
+    <label>Anthropic API Key (stored on device only)</label>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-…"
+           autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="key-hint">Get key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys → Create Key</div>
+    <button class="save-btn" onclick="saveKey()">Save Key</button>
+  </div>
+
+  <!-- Mode Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-single" onclick="switchTab('single')">📊 Single Chart</button>
+    <button class="tab-btn" id="tab-batch"  onclick="switchTab('batch')">📂 Batch Scan</button>
+  </div>
+
+  <!-- ═══ SINGLE MODE ═══ -->
+  <div id="mode-single">
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="upload-zone" id="uploadZone" onclick="openLibrary('single')">
+        <div class="upload-icon">📊</div>
+        <div class="upload-hint">Tap to select chart image<span>Camera · Photos Library</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="action-btn camera" onclick="openCamera()"><span class="icon">📷</span>Camera</button>
+        <button class="action-btn camera" onclick="openLibrary('single')"><span class="icon">🖼️</span>Library</button>
+      </div>
+      <button class="action-btn analyze" id="analyzeBtn" disabled onclick="analyzeSingle()">
+        <span class="icon">🔍</span>Analyze Chart
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ BATCH MODE ═══ -->
+  <div id="mode-batch" style="display:none;">
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <!-- Drop zone for batch -->
+      <div class="upload-zone" id="batchZone" onclick="openLibrary('batch')" style="min-height:100px;">
+        <div class="upload-icon">📂</div>
+        <div class="upload-hint">Tap to select multiple images<span>Hold to multi-select in Photos</span></div>
+      </div>
+
+      <!-- Queue thumbnails -->
+      <div id="queueSection" style="display:none;">
+        <div class="queue-header">
+          <div class="queue-title">Selected Images</div>
+          <div class="queue-count" id="queueCount">0 images</div>
+        </div>
+        <div class="queue-grid" id="queueGrid"></div>
+        <div class="progress-bar" id="progressBar" style="display:none;">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-label" id="progressLabel" style="display:none;"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="action-btn camera" onclick="openLibrary('batch')"><span class="icon">➕</span>Add Images</button>
+        <button class="action-btn camera" onclick="clearBatch()" id="clearBtn" style="display:none;">
+          <span class="icon">🗑️</span>Clear
+        </button>
+      </div>
+      <button class="action-btn analyze" id="batchAnalyzeBtn" disabled onclick="analyzeBatch()">
+        <span class="icon">🚀</span>Scan All Images
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-card" id="loadingCard">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Analyzing chart…</div>
+    <div class="loading-sub" id="loadingSub">Claude is reading the Simplified Chinese data</div>
+  </div>
+
+  <!-- Single Result -->
+  <div class="result-card" id="resultCard"></div>
+
+  <!-- Batch Report -->
+  <div class="report-card" id="reportCard"></div>
+
+  <!-- Error -->
+  <div class="error-card" id="errorCard">
+    <div class="error-title">Analysis Failed</div>
+    <div class="error-msg"  id="errorMsg"></div>
+    <div class="error-hint" id="errorHint"></div>
+  </div>
+
+</div><!-- /.app -->
+
+<div class="toast" id="toast"></div>
+<input type="file" id="camera-input"  accept="image/*" capture="environment" onchange="handleSingleFile(event)" style="display:none">
+<input type="file" id="library-single" accept="image/*" onchange="handleSingleFile(event)" style="display:none">
+<input type="file" id="library-batch"  accept="image/*" multiple onchange="handleBatchFiles(event)" style="display:none">
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let singleImageB64 = null;
+let singleMime     = 'image/jpeg';
+let batchQueue     = [];   // [{b64, mime, name, thumb}]
+let batchResults   = [];   // [{data, index}]
+let currentTab     = 'single';
+let isAnalyzing    = false;
+
+// ── API Key ────────────────────────────────────────────────────────
+function loadKey(){ return localStorage.getItem('anthropic_key') || ''; }
+function saveKey(){
+  const k = document.getElementById('apiKeyInput').value.trim();
+  if(!k){ showToast('Please enter your API key'); return; }
+  localStorage.setItem('anthropic_key', k);
+  updateKeyUI(k);
+  document.getElementById('keyPanel').classList.remove('open');
+  showToast('✅ API key saved');
+}
+function updateKeyUI(key){
+  const btn=document.getElementById('keyToggle');
+  document.getElementById('keyIcon').textContent  = key ? '✅' : '🔑';
+  document.getElementById('keyLabel').textContent = key ? '…'+key.slice(-6) : 'API Key';
+  btn.classList.toggle('has-key', !!key);
+}
+function toggleKeyPanel(){
+  const p=document.getElementById('keyPanel');
+  const open=p.classList.toggle('open');
+  if(open){ document.getElementById('apiKeyInput').value=loadKey();
+    setTimeout(()=>document.getElementById('apiKeyInput').focus(),100); }
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────
+function switchTab(tab){
+  currentTab = tab;
+  document.getElementById('mode-single').style.display = tab==='single' ? 'block' : 'none';
+  document.getElementById('mode-batch').style.display  = tab==='batch'  ? 'block' : 'none';
+  document.getElementById('tab-single').classList.toggle('active', tab==='single');
+  document.getElementById('tab-batch').classList.toggle('active',  tab==='batch');
+  hide('resultCard'); hide('reportCard'); hide('errorCard'); hide('loadingCard');
+}
+
+// ── File inputs ────────────────────────────────────────────────────
+function openCamera()              { document.getElementById('camera-input').click(); }
+function openLibrary(mode){
+  if(mode==='batch') document.getElementById('library-batch').click();
+  else               document.getElementById('library-single').click();
+}
+
+function handleSingleFile(e){
+  const file=e.target.files[0]; if(!file) return; e.target.value='';
+  singleMime=file.type||'image/jpeg';
+  readFileB64(file, b64=>{
+    singleImageB64=b64;
+    const zone=document.getElementById('uploadZone');
+    zone.innerHTML=`<img src="data:${singleMime};base64,${b64}" alt="preview">`;
+    zone.classList.add('has-image');
+    document.getElementById('analyzeBtn').disabled=false;
+    hide('resultCard'); hide('errorCard');
+  });
+}
+
+function handleBatchFiles(e){
+  const files=Array.from(e.target.files); if(!files.length) return; e.target.value='';
+  let loaded=0;
+  files.forEach((file,i)=>{
+    readFileB64(file, b64=>{
+      batchQueue.push({ b64, mime:file.type||'image/jpeg', name:file.name, thumb:`data:${file.type};base64,${b64}` });
+      loaded++;
+      if(loaded===files.length) renderQueue();
+    });
+  });
+}
+
+function readFileB64(file, cb){
+  const r=new FileReader();
+  r.onload=ev=>cb(ev.target.result.split(',')[1]);
+  r.readAsDataURL(file);
+}
+
+// ── Queue UI ───────────────────────────────────────────────────────
+function renderQueue(){
+  const section=document.getElementById('queueSection');
+  const grid   =document.getElementById('queueGrid');
+  const count  =document.getElementById('queueCount');
+  section.style.display='block';
+  document.getElementById('clearBtn').style.display='flex';
+  document.getElementById('batchAnalyzeBtn').disabled=false;
+  count.textContent=batchQueue.length+' image'+(batchQueue.length!==1?'s':'');
+  grid.innerHTML='';
+  batchQueue.forEach((item,i)=>{
+    grid.innerHTML+=`
+      <div class="queue-thumb" id="qthumb-${i}">
+        <img src="${item.thumb}" alt="img ${i+1}">
+        <div class="q-num">${i+1}</div>
+        <div class="q-status" id="qstatus-${i}">⏳</div>
+      </div>`;
+  });
+  const bz=document.getElementById('batchZone');
+  bz.innerHTML='<div class="upload-icon">➕</div><div class="upload-hint">Tap to add more<span>or Scan All Images below</span></div>';
+  bz.classList.remove('has-image');
+}
+
+function clearBatch(){
+  batchQueue=[]; batchResults=[];
+  document.getElementById('queueSection').style.display='none';
+  document.getElementById('clearBtn').style.display='none';
+  document.getElementById('batchAnalyzeBtn').disabled=true;
+  const bz=document.getElementById('batchZone');
+  bz.innerHTML='<div class="upload-icon">📂</div><div class="upload-hint">Tap to select multiple images<span>Hold to multi-select in Photos</span></div>';
+  bz.classList.remove('has-image');
+  hide('reportCard'); hide('errorCard');
+  document.getElementById('progressBar').style.display='none';
+  document.getElementById('progressLabel').style.display='none';
+}
+
+function setThumbStatus(i, status, emoji){
+  const el=document.getElementById(`qstatus-${i}`);
+  if(!el) return;
+  el.className='q-status '+status;
+  el.textContent=emoji;
+}
+
+// ── Prompt ─────────────────────────────────────────────────────────
+const PROMPT=`You are an expert financial analyst specializing in Chinese equity, futures and financial markets.
+Analyze this Chinese brokerage chart image which contains Simplified Chinese labels, candlestick data, RSI, MACD and price ticker information.
+
+Return ONLY a JSON object — no markdown, no extra text:
+{
+  "subject":{"name":"instrument name","code":"ticker or null","type":"stock/futures/index/forex/other"},
+  "timeframe":{"chart_period":"e.g. 日K/周K/60分钟K","days_covered":30,"trend_direction":"uptrend/downtrend/sideways/unclear"},
+  "price":{"current":123.45,"change_pct":"+1.23%","support":120.00,"resistance":130.00},
+  "rsi":{"value":65.2,"zone":"overbought/oversold/neutral","signal":"buy/sell/neutral"},
+  "macd":{"crossover":"golden_cross/death_cross/none/unclear","histogram_trend":"expanding/shrinking/flat","signal":"buy/sell/neutral"},
+  "key_observations":["Observation 1","Observation 2"],
+  "strategy":{"action":"BUY/SELL/HOLD/WAIT","confidence":"HIGH/MEDIUM/LOW",
+    "entry_price_range":"121.50-123.00","stop_loss":"118.00","take_profit":"135.00",
+    "holding_period":"3-5 trading days","reasoning":"2-3 sentence rationale"},
+  "alert":{"open_now":false,"close_now":false,"urgency":"IMMEDIATE/TODAY/SOON/NONE","message":"alert text"},
+  "image_quality":"good/fair/poor"
+}
+If any field is not visible, use null. Respond ONLY with the JSON.`;
+
+// ── API call ───────────────────────────────────────────────────────
+async function callClaude(b64, mime){
+  const key=loadKey();
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-opus-4-5', max_tokens:1500,
+      messages:[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+        {type:'text',text:PROMPT}
+      ]}]
+    })
+  });
+  const json=await res.json();
+  if(!res.ok) throw new Error(json?.error?.message||`HTTP ${res.status}`);
+  let raw=json.content?.[0]?.text||'';
+  raw=raw.replace(/```json|```/g,'').trim();
+  return JSON.parse(raw);
+}
+
+// ── Single analyze ─────────────────────────────────────────────────
+async function analyzeSingle(){
+  if(!singleImageB64){ showToast('Please select an image first'); return; }
+  const key=loadKey();
+  if(!key){ showToast('⚠️ Please save your API key first'); toggleKeyPanel(); return; }
+  show('loadingCard'); hide('resultCard'); hide('errorCard');
+  document.getElementById('analyzeBtn').disabled=true;
+  document.getElementById('loadingText').textContent='Analyzing chart…';
+  document.getElementById('loadingSub').textContent='Claude is reading the Simplified Chinese data';
+  try{
+    const data=await callClaude(singleImageB64, singleMime);
+    renderSingleResult(data);
+    hide('loadingCard'); show('resultCard');
+  } catch(err){
+    hide('loadingCard');
+    showError(err.message);
+  }
+  document.getElementById('analyzeBtn').disabled=false;
+}
+
+// ── Batch analyze ──────────────────────────────────────────────────
+async function analyzeBatch(){
+  if(!batchQueue.length){ showToast('Please add images first'); return; }
+  const key=loadKey();
+  if(!key){ showToast('⚠️ Please save your API key first'); toggleKeyPanel(); return; }
+  if(isAnalyzing) return;
+  isAnalyzing=true;
+  batchResults=[];
+  document.getElementById('batchAnalyzeBtn').disabled=true;
+  hide('reportCard'); hide('errorCard');
+
+  const pb=document.getElementById('progressBar');
+  const pf=document.getElementById('progressFill');
+  const pl=document.getElementById('progressLabel');
+  pb.style.display='block'; pl.style.display='block';
+
+  show('loadingCard');
+
+  for(let i=0;i<batchQueue.length;i++){
+    const item=batchQueue[i];
+    setThumbStatus(i,'active','🔍');
+    document.getElementById('loadingText').textContent=`Analyzing image ${i+1} of ${batchQueue.length}`;
+    document.getElementById('loadingSub').textContent=item.name||`Image ${i+1}`;
+    pf.style.width=Math.round((i/batchQueue.length)*100)+'%';
+    pl.textContent=`${i} of ${batchQueue.length} complete`;
+
+    try{
+      const data=await callClaude(item.b64, item.mime);
+      data._imgIndex=i; data._imgName=item.name;
+      batchResults.push(data);
+      setThumbStatus(i,'done','✅');
+    } catch(err){
+      setThumbStatus(i,'error','❌');
+      batchResults.push({_imgIndex:i, _imgName:item.name, _error:err.message});
+    }
+
+    // Small pause to avoid rate limiting
+    if(i < batchQueue.length-1) await sleep(800);
+  }
+
+  pf.style.width='100%';
+  pl.textContent=`${batchQueue.length} of ${batchQueue.length} complete`;
+  hide('loadingCard');
+  renderReport(batchResults);
+  show('reportCard');
+  isAnalyzing=false;
+  document.getElementById('batchAnalyzeBtn').disabled=false;
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+// ── Render single result ───────────────────────────────────────────
+function renderSingleResult(d){
+  const sub=d.subject||{}, tf=d.timeframe||{}, pr=d.price||{};
+  const rsi=d.rsi||{}, macd=d.macd||{}, strat=d.strategy||{}, alrt=d.alert||{};
+  const obs=d.key_observations||[];
+  const action=(strat.action||'WAIT').toUpperCase();
+  const conf=(strat.confidence||'—').toUpperCase();
+  const trend=(tf.trend_direction||'unclear').toLowerCase();
+  const tMap={uptrend:{cls:'up',pct:80,label:'Uptrend ↑'},downtrend:{cls:'down',pct:80,label:'Downtrend ↓'},sideways:{cls:'side',pct:50,label:'Sideways →'},unclear:{cls:'side',pct:30,label:'Unclear'}};
+  const t=tMap[trend]||tMap.unclear;
+  const rsiCls={'buy':'bull','sell':'bear','neutral':'neut'}[rsi.signal]||'neut';
+  const macdCls={'buy':'bull','sell':'bear','neutral':'neut'}[macd.signal]||'neut';
+  const chgCls=(pr.change_pct||'').startsWith('-')?'down':'up';
+  const alertHTML=(alrt.open_now||alrt.close_now||alrt.urgency==='IMMEDIATE')
+    ?`<div class="alert-banner ${alrt.open_now?'buy-alert':''} show"><div class="alert-title">${alrt.open_now?'🚀 Open Position':'⚠️ Close Position'}</div>${esc(alrt.message||'')}</div>`:'';
+  const obsHTML=obs.slice(0,5).map(o=>`<div class="keypoint">${esc(o)}</div>`).join('');
+  document.getElementById('resultCard').innerHTML=`
+    <div class="result-header"><div class="action-badge ${action}">${action}</div><div class="conf-pill ${conf}">${conf} confidence</div></div>
+    <div class="instrument-row"><div class="instrument-name">${esc(sub.name||'—')}</div>
+      <div class="instrument-meta">${sub.code?esc(sub.code)+' · ':''}${esc(sub.type||'')}${tf.chart_period?' · '+esc(tf.chart_period):''}${tf.days_covered?' · '+tf.days_covered+'d':''}</div></div>
+    <div class="trend-row"><div class="trend-label">Trend</div>
+      <div class="trend-track"><div class="trend-fill ${t.cls}" style="width:${t.pct}%"></div></div>
+      <div class="trend-tag ${t.cls}">${t.label}</div></div>
+    <div class="price-row">
+      <div class="price-cell"><div class="price-label">Price</div><div class="price-value">${pr.current??'—'}</div></div>
+      <div class="price-cell"><div class="price-label">Change</div><div class="price-value ${chgCls}">${esc(pr.change_pct||'—')}</div></div>
+      <div class="price-cell"><div class="price-label">Support/Resist</div><div class="price-value" style="font-size:12px">${pr.support??'—'} / ${pr.resistance??'—'}</div></div>
+    </div>
+    <div class="indicator-row">
+      <div class="indicator-cell"><div class="ind-label">RSI</div>
+        <div class="ind-value ${rsiCls}">${rsi.value!=null?Number(rsi.value).toFixed(1):'—'} <span style="font-size:11px">(${esc(rsi.zone||'—')})</span></div>
+        <div class="ind-signal">Signal: ${esc(rsi.signal||'—')}</div></div>
+      <div class="indicator-cell"><div class="ind-label">MACD</div>
+        <div class="ind-value ${macdCls}">${esc(macd.crossover||'—')}</div>
+        <div class="ind-signal">${esc(macd.histogram_trend||'—')} · ${esc(macd.signal||'—')}</div></div>
+    </div>
+    <div class="trade-grid">
+      <div class="trade-cell"><div class="trade-label">Entry Range</div><div class="trade-value entry">${esc(strat.entry_price_range||'—')}</div></div>
+      <div class="trade-cell"><div class="trade-label">Holding Period</div><div class="trade-value">${esc(strat.holding_period||'—')}</div></div>
+      <div class="trade-cell"><div class="trade-label">Stop Loss</div><div class="trade-value sl">${esc(strat.stop_loss||'—')}</div></div>
+      <div class="trade-cell"><div class="trade-label">Take Profit</div><div class="trade-value tp">${esc(strat.take_profit||'—')}</div></div>
+    </div>
+    ${alertHTML}
+    <div class="reasoning-section"><div class="section-title">Strategy Reasoning</div><div class="reasoning-text">${esc(strat.reasoning||'—')}</div></div>
+    ${obs.length?`<div class="keypoints-section"><div class="section-title">Key Observations</div>${obsHTML}</div>`:''}
+    <div class="result-footer"><div class="footer-ts">${new Date().toLocaleTimeString()}</div><div class="footer-quality ${d.image_quality||'fair'}">Image: ${d.image_quality||'fair'}</div></div>`;
+}
+
+// ── Render batch report ────────────────────────────────────────────
+function renderReport(results){
+  const today=new Date();
+  const dateStr=today.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Separate successful and failed
+  const good=results.filter(r=>!r._error);
+  const bad =results.filter(r=>r._error);
+
+  // Group by type
+  const groups={};
+  good.forEach(d=>{
+    const type=(d.subject?.type||'other').toLowerCase();
+    if(!groups[type]) groups[type]=[];
+    groups[type].push(d);
+  });
+
+  // Sort each group by price gap (TP - SL), descending
+  function priceGap(d){
+    const sl=parseFloat((d.strategy?.stop_loss||'').replace(/[^0-9.]/g,''))||0;
+    const tp=parseFloat((d.strategy?.take_profit||'').replace(/[^0-9.]/g,''))||0;
+    return tp>sl ? tp-sl : 0;
+  }
+  Object.keys(groups).forEach(g=>{
+    groups[g].sort((a,b)=>priceGap(b)-priceGap(a));
+  });
+
+  // Build group HTML
+  const typeOrder=['stock','futures','index','forex','other'];
+  const typeLabels={stock:'📈 Stocks',futures:'⚡ Futures',index:'🏛️ Index',forex:'💱 Forex',other:'📊 Other'};
+  let groupHTML='';
+  typeOrder.filter(t=>groups[t]?.length).forEach(type=>{
+    const rows=groups[type].map(d=>{
+      const strat=d.strategy||{};
+      const action=(strat.action||'WAIT').toUpperCase();
+      const conf=(strat.confidence||'').toUpperCase();
+      const gap=priceGap(d);
+      const gapStr=gap>0 ? gap.toFixed(2) : '—';
+      const obs=(d.key_observations||[]).slice(0,2).map(o=>`• ${o}`).join('\n');
+      return `
+        <div class="report-row">
+          <div class="rr-top">
+            <div class="rr-name">${esc(d.subject?.name||'Unknown')}${d.subject?.code?' ('+esc(d.subject.code)+')':''}</div>
+            <div class="rr-gap">Gap: ${gapStr}</div>
+          </div>
+          <div class="rr-badges">
+            <span class="rr-badge ${action}">${action}</span>
+            ${conf?`<span class="rr-badge ${conf}">${conf}</span>`:''}
+            <span class="rr-badge" style="background:rgba(0,212,170,.1);color:var(--accent)">${esc(d.timeframe?.chart_period||'—')}</span>
+          </div>
+          <div class="rr-levels">
+            <div class="rr-level"><div class="rr-level-label">Entry</div><div class="rr-level-val entry">${esc(strat.entry_price_range||'—')}</div></div>
+            <div class="rr-level"><div class="rr-level-label">Stop Loss</div><div class="rr-level-val sl">${esc(strat.stop_loss||'—')}</div></div>
+            <div class="rr-level"><div class="rr-level-label">Take Profit</div><div class="rr-level-val tp">${esc(strat.take_profit||'—')}</div></div>
+          </div>
+          <div class="rr-reasoning">${esc(strat.reasoning||'—')}</div>
+        </div>`;
+    }).join('');
+    groupHTML+=`<div class="report-group"><div class="report-group-title">${typeLabels[type]||type} (${groups[type].length})</div>${rows}</div>`;
+  });
+
+  // Failed images note
+  const failHTML=bad.length
+    ?`<div style="padding:12px 18px;font-size:12px;color:var(--muted)">⚠️ ${bad.length} image(s) could not be analyzed.</div>`:'';
+
+  document.getElementById('reportCard').innerHTML=`
+    <div class="report-header">
+      <div class="report-title">📋 Daily Report</div>
+      <div class="report-date">${dateStr}</div>
+    </div>
+    <div style="padding:10px 18px 4px;font-size:11px;color:var(--muted)">
+      ${good.length} charts analyzed · sorted by price gap (largest first)
+    </div>
+    ${groupHTML}
+    ${failHTML}
+    <button class="report-save-btn" onclick="saveToNotes()">
+      <span>📝</span> Save to Notes
+    </button>`;
+}
+
+// ── Save to Notes ──────────────────────────────────────────────────
+function saveToNotes(){
+  const today=new Date();
+  const dateStr=today.toLocaleDateString('en-US',{year:'numeric',month:'2-digit',day:'2-digit'});
+  const title=`Trading Analysis ${dateStr}`;
+
+  // Build plain text report
+  let text=`${title}\n${'='.repeat(50)}\n\n`;
+
+  const good=batchResults.filter(r=>!r._error);
+
+  // Group & sort same as render
+  const groups={};
+  good.forEach(d=>{
+    const type=(d.subject?.type||'other').toLowerCase();
+    if(!groups[type]) groups[type]=[];
+    groups[type].push(d);
+  });
+  function priceGap(d){
+    const sl=parseFloat((d.strategy?.stop_loss||'').replace(/[^0-9.]/g,''))||0;
+    const tp=parseFloat((d.strategy?.take_profit||'').replace(/[^0-9.]/g,''))||0;
+    return tp>sl?tp-sl:0;
+  }
+  const typeOrder=['stock','futures','index','forex','other'];
+  const typeLabels={stock:'STOCKS',futures:'FUTURES',index:'INDEX',forex:'FOREX',other:'OTHER'};
+
+  typeOrder.filter(t=>groups[t]?.length).forEach(type=>{
+    const items=[...groups[type]].sort((a,b)=>priceGap(b)-priceGap(a));
+    text+=`── ${typeLabels[type]} ──\n\n`;
+    items.forEach(d=>{
+      const s=d.strategy||{}, pr=d.price||{}, rsi=d.rsi||{}, macd=d.macd||{};
+      const gap=priceGap(d);
+      text+=`${d.subject?.name||'Unknown'}${d.subject?.code?' ('+d.subject.code+')':''}\n`;
+      text+=`Action: ${s.action||'—'}  |  Confidence: ${s.confidence||'—'}  |  Gap: ${gap>0?gap.toFixed(2):'—'}\n`;
+      text+=`Period: ${d.timeframe?.chart_period||'—'}  |  Trend: ${d.timeframe?.trend_direction||'—'}\n`;
+      text+=`Price: ${pr.current??'—'}  ${pr.change_pct||''}\n`;
+      text+=`Support: ${pr.support??'—'}  |  Resistance: ${pr.resistance??'—'}\n`;
+      text+=`RSI: ${rsi.value!=null?Number(rsi.value).toFixed(1):'—'} (${rsi.zone||'—'}) → ${rsi.signal||'—'}\n`;
+      text+=`MACD: ${macd.crossover||'—'}  |  ${macd.histogram_trend||'—'}  → ${macd.signal||'—'}\n`;
+      text+=`Entry: ${s.entry_price_range||'—'}  |  SL: ${s.stop_loss||'—'}  |  TP: ${s.take_profit||'—'}\n`;
+      text+=`Hold: ${s.holding_period||'—'}\n`;
+      text+=`Reasoning: ${s.reasoning||'—'}\n`;
+      if(d.key_observations?.length){
+        text+=`Observations:\n`;
+        d.key_observations.forEach(o=>text+=`  • ${o}\n`);
+      }
+      text+='\n';
+    });
+  });
+  text+=`\nGenerated by Trade Lens AI · ${new Date().toLocaleString()}`;
+
+  // Use Web Share API — on iOS this shows the system share sheet including Notes
+  if(navigator.share){
+    navigator.share({ title, text }).then(()=>showToast('✅ Shared successfully')).catch(()=>{});
+  } else {
+    // Fallback: download as text file
+    const blob=new Blob([text],{type:'text/plain'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=title+'.txt'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('📥 Report downloaded');
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
+function show(id){ document.getElementById(id).classList.add('show'); }
+function hide(id){ document.getElementById(id).classList.remove('show'); }
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showError(msg){
+  let hint='';
+  if(msg.includes('401')||msg.includes('auth')){ msg='Invalid API key.'; hint='Check console.anthropic.com → API Keys'; }
+  else if(msg.includes('credit')||msg.includes('402')){ msg='Insufficient credits.'; hint='Top up at console.anthropic.com → Billing'; }
+  else if(msg.includes('JSON')){ msg='Unexpected response. Please try again.'; }
+  document.getElementById('errorMsg').textContent=msg;
+  document.getElementById('errorHint').textContent=hint;
+  show('errorCard');
+}
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+(function init(){ const k=loadKey(); if(k) updateKeyUI(k); })();
+</script>
+</body>
+</html>
