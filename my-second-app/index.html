@@ -1,1 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ScreenScan">
+<meta name="theme-color" content="#060606">
+<title>ScreenScan</title>
+<link rel="manifest" id="pwa-manifest">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='38' fill='%23060606'/><text x='28' y='130' font-size='100' fill='%23f0a500'>◈</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400&display=swap');
 
+:root {
+  --bg:      #060606;
+  --s1:      #0d0d0d;
+  --s2:      #141414;
+  --bd:      #1c1c1c;
+  --bd2:     #282828;
+  --gold:    #f0a500;
+  --gold-a:  rgba(240,165,0,.12);
+  --up:      #00d49c;
+  --dn:      #ff3d5a;
+  --flat:    #64748b;
+  --tx:      #c8c8c8;
+  --tx2:     #484848;
+  --safe-b:  env(safe-area-inset-bottom, 0px);
+  --safe-t:  env(safe-area-inset-top,    0px);
+  --mono: 'IBM Plex Mono', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--mono);overflow:hidden}
+
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;height:100dvh;height:100vh}
+#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.tab{display:none;padding:18px 16px 24px}
+.tab.on{display:block}
+
+/* ── Header ── */
+header{
+  padding:14px 18px 12px;
+  padding-top:calc(14px + var(--safe-t));
+  border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;background:var(--bg);
+}
+.logo{font-size:11px;font-weight:600;letter-spacing:.3em;color:var(--gold)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--tx2);transition:background .3s}
+.pulse.on{background:var(--up);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Bottom Nav ── */
+nav{
+  display:flex;border-top:1px solid var(--bd);
+  background:var(--bg);flex-shrink:0;
+  padding-bottom:var(--safe-b);
+}
+.nb{
+  flex:1;padding:11px 0 9px;display:flex;flex-direction:column;
+  align-items:center;gap:4px;background:none;border:none;
+  color:var(--tx2);font-family:var(--mono);font-size:8px;letter-spacing:.18em;cursor:pointer;
+  transition:color .15s;
+}
+.nb.on{color:var(--gold)}
+.nb svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.4}
+
+/* ── Buttons ── */
+.btn{
+  width:100%;padding:11px;border:1px solid var(--bd2);border-radius:2px;
+  background:var(--s1);color:var(--tx);font-family:var(--mono);font-size:10px;
+  letter-spacing:.12em;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:8px;transition:all .12s;
+}
+.btn:active{opacity:.65;transform:scale(.98)}
+.btn.gold{border-color:var(--gold);color:var(--gold)}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.4;flex-shrink:0}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.full{grid-column:1/-1}
+input[type=file]{display:none}
+
+/* ── Drop Zone ── */
+.dz{
+  border:1px dashed var(--bd2);border-radius:3px;padding:36px 16px;
+  text-align:center;cursor:pointer;transition:border-color .2s,background .2s;
+}
+.dz.over{border-color:var(--gold);background:var(--gold-a)}
+.dz-ico{font-size:28px;margin-bottom:10px;opacity:.45}
+.dz p{font-size:11px;color:var(--tx2);line-height:1.7}
+.dz span{color:var(--gold)}
+
+/* ── Preview ── */
+#preview-wrap{margin-top:16px;display:none}
+#prev-img{width:100%;border-radius:3px;border:1px solid var(--bd);max-height:180px;object-fit:contain;background:#000}
+
+/* ── OCR Status ── */
+#ocr-box{
+  margin-top:12px;padding:10px 12px;background:var(--s1);
+  border:1px solid var(--bd);border-radius:2px;font-size:10px;
+  color:var(--tx2);display:none;
+}
+#ocr-bar{height:1px;background:var(--gold);width:0%;margin-top:8px;transition:width .25s}
+
+/* ── Data Cards ── */
+#result-wrap{margin-top:18px;display:none}
+.sec-lbl{font-size:8px;letter-spacing:.3em;color:var(--tx2);margin-bottom:8px;text-transform:uppercase}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:2px;padding:10px 11px}
+.card.full{grid-column:1/-1}
+.card .lbl{font-size:8px;color:var(--tx2);letter-spacing:.18em;margin-bottom:5px}
+.card .val{font-size:15px;font-weight:500;line-height:1.2}
+.card .sub{font-size:9px;color:var(--tx2);margin-top:3px}
+.up{color:var(--up)!important}.dn{color:var(--dn)!important}
+.flat{color:var(--flat)!important}.gold{color:var(--gold)!important}
+.raw{
+  font-size:9px;color:var(--tx2);max-height:88px;overflow-y:auto;
+  white-space:pre-wrap;word-break:break-all;line-height:1.55;
+}
+
+/* ── Conditions Tab ── */
+.cg{
+  background:var(--s1);border:1px solid var(--bd);border-radius:2px;
+  padding:14px;margin-bottom:10px;
+}
+.cg h3{font-size:9px;letter-spacing:.25em;color:var(--gold);margin-bottom:12px;text-transform:uppercase}
+.field{margin-bottom:11px}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:9px;color:var(--tx2);margin-bottom:5px;letter-spacing:.1em}
+.field input,.field select{
+  width:100%;background:var(--s2);border:1px solid var(--bd2);border-radius:2px;
+  color:var(--tx);font-family:var(--mono);font-size:13px;padding:8px 9px;-webkit-appearance:none;
+}
+.field input:focus,.field select:focus{outline:none;border-color:var(--gold)}
+.field select option{background:#111}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.alert{padding:9px 11px;border-radius:2px;font-size:10px;margin-top:8px}
+.alert.ok{background:rgba(0,212,156,.08);border:1px solid rgba(0,212,156,.25);color:var(--up)}
+.alert.err{background:rgba(255,61,90,.08);border:1px solid rgba(255,61,90,.25);color:var(--dn)}
+
+/* ── Report Tab ── */
+#r-empty{text-align:center;padding:56px 20px;color:var(--tx2);font-size:10px;line-height:2.2}
+#r-out{display:none}
+.r-head{border-bottom:1px solid var(--bd2);padding-bottom:12px;margin-bottom:14px}
+.r-title{font-size:13px;font-weight:600;color:var(--gold);letter-spacing:.1em}
+.r-dt{font-size:9px;color:var(--tx2);margin-top:4px}
+.r-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--bd);
+}
+.r-row .rk{font-size:9px;color:var(--tx2);letter-spacing:.12em}
+.r-row .rv{font-size:12px;font-weight:500;text-align:right;max-width:58%}
+.cond-block{
+  margin-top:14px;padding:11px;border-radius:2px;font-size:10px;line-height:2;
+}
+.cond-block.pass{background:rgba(0,212,156,.08);border:1px solid rgba(0,212,156,.22);color:var(--up)}
+.cond-block.fail{background:rgba(255,61,90,.08);border:1px solid rgba(255,61,90,.22);color:var(--dn)}
+.copy-btn{
+  width:100%;margin-top:14px;padding:13px;background:var(--gold);color:#000;border:none;
+  border-radius:2px;font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:.18em;cursor:pointer;
+}
+.copy-btn:active{opacity:.8}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">◈ SCREENSCAN</div>
+    <div class="pulse" id="dot"></div>
+  </header>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- ─ SCAN ─ -->
+    <div class="tab on" id="tab-scan">
+      <div class="dz" id="dz">
+        <div class="dz-ico">⬡</div>
+        <p>Drop screenshot here<br><span>tap to upload · or use buttons</span></p>
+      </div>
+
+      <div class="btn-grid">
+        <button class="btn" id="btn-cam">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          CAMERA
+        </button>
+        <button class="btn" id="btn-up">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          UPLOAD
+        </button>
+        <button class="btn gold full" id="btn-run" style="display:none">
+          ▶ ANALYZE
+        </button>
+      </div>
+
+      <div id="preview-wrap"><img id="prev-img" alt="Preview"></div>
+
+      <div id="ocr-box">
+        <span id="ocr-msg">Initializing…</span>
+        <div id="ocr-bar"></div>
+      </div>
+
+      <div id="result-wrap">
+        <div class="sec-lbl">Extracted Metrics</div>
+        <div class="cards">
+          <div class="card">
+            <div class="lbl">TREND</div>
+            <div class="val" id="d-trend">—</div>
+          </div>
+          <div class="card">
+            <div class="lbl">DAYS COVERED</div>
+            <div class="val" id="d-days">—</div>
+          </div>
+          <div class="card">
+            <div class="lbl">CURRENT PRICE</div>
+            <div class="val gold" id="d-cur">—</div>
+          </div>
+          <div class="card">
+            <div class="lbl">DELTA L→H</div>
+            <div class="val up" id="d-delta">—</div>
+          </div>
+          <div class="card">
+            <div class="lbl">LOWEST</div>
+            <div class="val dn" id="d-lo">—</div>
+            <div class="sub" id="d-lo-dt">—</div>
+          </div>
+          <div class="card">
+            <div class="lbl">HIGHEST</div>
+            <div class="val up" id="d-hi">—</div>
+            <div class="sub" id="d-hi-dt">—</div>
+          </div>
+          <div class="card full">
+            <div class="lbl">RAW OCR TEXT</div>
+            <div class="raw" id="d-raw">—</div>
+          </div>
+        </div>
+        <button class="btn gold full" id="btn-gen">⚑ GENERATE REPORT</button>
+      </div>
+    </div>
+
+    <!-- ─ CONDITIONS ─ -->
+    <div class="tab" id="tab-cond">
+
+      <div class="cg">
+        <h3>Trend Filter</h3>
+        <div class="field">
+          <label>Required Trend Direction</label>
+          <select id="c-trend">
+            <option value="any">Any direction</option>
+            <option value="up">↑ Uptrend</option>
+            <option value="down">↓ Downtrend</option>
+            <option value="flat">→ Flat</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cg">
+        <h3>Price Thresholds</h3>
+        <div class="f2">
+          <div class="field">
+            <label>Lowest Price ≥ ($)</label>
+            <input type="number" id="c-lo" placeholder="0" step="0.01" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label>Highest Price ≤ ($)</label>
+            <input type="number" id="c-hi" placeholder="∞" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        <div class="field">
+          <label>Current Price Alert ≥ ($)</label>
+          <input type="number" id="c-cur" placeholder="e.g. 150.00" step="0.01" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="cg">
+        <h3>Delta Conditions</h3>
+        <div class="f2">
+          <div class="field">
+            <label>Min Delta ($)</label>
+            <input type="number" id="c-dlt" placeholder="0" step="0.01" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label>Min Delta (%)</label>
+            <input type="number" id="c-dpct" placeholder="0" step="0.1" inputmode="decimal">
+          </div>
+        </div>
+      </div>
+
+      <div class="cg">
+        <h3>Time Coverage</h3>
+        <div class="f2">
+          <div class="field">
+            <label>Min Days Covered</label>
+            <input type="number" id="c-dmin" placeholder="0" step="1" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label>Max Days Covered</label>
+            <input type="number" id="c-dmax" placeholder="∞" step="1" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn gold full" id="btn-save" style="margin-top:4px">✓ SAVE CONDITIONS</button>
+      <div id="saved-ok" class="alert ok" style="display:none">Conditions saved.</div>
+    </div>
+
+    <!-- ─ REPORT ─ -->
+    <div class="tab" id="tab-rep">
+      <div id="r-empty">No report yet.<br>Scan an image on the SCAN tab<br>then tap GENERATE REPORT.</div>
+      <div id="r-out">
+        <div class="r-head">
+          <div class="r-title">ANALYSIS REPORT</div>
+          <div class="r-dt" id="r-dt"></div>
+        </div>
+        <div id="r-rows"></div>
+        <div id="r-conds"></div>
+        <button class="copy-btn" id="btn-copy">⎘ COPY TO CLIPBOARD</button>
+        <div id="copy-ok" class="alert ok" style="display:none;margin-top:8px">Copied! Open Notes and paste.</div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- Bottom Nav -->
+  <nav>
+    <button class="nb on" data-tab="scan">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="3" y1="9" x2="5" y2="9"/><line x1="3" y1="15" x2="5" y2="15"/><line x1="19" y1="9" x2="21" y2="9"/><line x1="19" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="5"/><line x1="15" y1="3" x2="15" y2="5"/><line x1="9" y1="19" x2="9" y2="21"/><line x1="15" y1="19" x2="15" y2="21"/></svg>
+      SCAN
+    </button>
+    <button class="nb" data-tab="cond">
+      <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+      CONDITIONS
+    </button>
+    <button class="nb" data-tab="rep">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      REPORT
+    </button>
+  </nav>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="f-up"  accept="image/*">
+<input type="file" id="f-cam" accept="image/*" capture="environment">
+
+<!-- Tesseract OCR (loaded from CDN into user's browser) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+// ── PWA Manifest (inline blob) ──────────────────────────────────
+(function(){
+  const m={
+    name:'ScreenScan Analyzer',short_name:'ScreenScan',
+    start_url:'.',display:'standalone',
+    background_color:'#060606',theme_color:'#060606',
+    icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='38' fill='%23060606'/><text x='28' y='130' font-size='100' fill='%23f0a500'>◈</text></svg>",sizes:'512x512',type:'image/svg+xml'}]
+  };
+  const b=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});
+  document.getElementById('pwa-manifest').href=URL.createObjectURL(b);
+})();
+
+// ── State ────────────────────────────────────────────────────────
+let imgData=null, analysis=null, reportText='';
+
+// ── Navigation ───────────────────────────────────────────────────
+function goTab(name){
+  document.querySelectorAll('.nb').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
+  document.querySelectorAll('.tab').forEach(p=>p.classList.toggle('on',p.id==='tab-'+name));
+}
+document.querySelectorAll('.nb').forEach(b=>b.addEventListener('click',()=>goTab(b.dataset.tab)));
+
+// ── Image Input ──────────────────────────────────────────────────
+const dz=document.getElementById('dz');
+dz.addEventListener('click',()=>document.getElementById('f-up').click());
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadImg(f)});
+document.getElementById('btn-cam').addEventListener('click',()=>document.getElementById('f-cam').click());
+document.getElementById('btn-up').addEventListener('click',()=>document.getElementById('f-up').click());
+['f-up','f-cam'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    const f=e.target.files[0]; if(f) loadImg(f); e.target.value='';
+  });
+});
+
+function loadImg(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    imgData=e.target.result;
+    document.getElementById('prev-img').src=imgData;
+    document.getElementById('preview-wrap').style.display='block';
+    document.getElementById('btn-run').style.display='flex';
+    document.getElementById('result-wrap').style.display='none';
+    document.getElementById('ocr-box').style.display='none';
+  };
+  r.readAsDataURL(file);
+}
+
+// ── OCR + Analysis ───────────────────────────────────────────────
+document.getElementById('btn-run').addEventListener('click',runOCR);
+
+async function runOCR(){
+  if(!imgData) return;
+  const box=document.getElementById('ocr-box');
+  const msg=document.getElementById('ocr-msg');
+  const bar=document.getElementById('ocr-bar');
+  const dot=document.getElementById('dot');
+  box.style.display='block'; bar.style.width='0%'; dot.classList.add('on');
+
+  try{
+    const res=await Tesseract.recognize(imgData,'eng',{
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          const p=Math.round(m.progress*100);
+          bar.style.width=p+'%';
+          msg.textContent='Scanning… '+p+'%';
+        }
+      }
+    });
+    msg.textContent='Analysis complete ✓';
+    dot.classList.remove('on');
+    const txt=res.data.text;
+    analysis=analyzeText(txt);
+    renderCards(analysis,txt);
+  }catch(err){
+    msg.textContent='Error: '+err.message;
+    dot.classList.remove('on');
+  }
+}
+
+// ── Analysis Engine ──────────────────────────────────────────────
+function analyzeText(text){
+  const prices=extractPrices(text);
+  const dates=extractDates(text);
+  const out={prices,dates,trend:'N/A',days:null,lo:null,loDt:null,hi:null,hiDt:null,delta:null,deltaPct:null,cur:null};
+  if(!prices.length) return out;
+
+  out.cur   = prices[prices.length-1];
+  out.lo    = Math.min(...prices);
+  out.hi    = Math.max(...prices);
+  out.delta = out.hi - out.lo;
+  out.deltaPct = out.lo>0 ? (out.delta/out.lo)*100 : null;
+
+  // Trend: first-third avg vs last-third avg
+  if(prices.length>=3){
+    const t=Math.max(1,Math.floor(prices.length/3));
+    const fa=avg(prices.slice(0,t)), la=avg(prices.slice(-t));
+    const ch=(la-fa)/fa;
+    out.trend = ch>0.02?'up':ch<-0.02?'down':'flat';
+  } else if(prices.length===2){
+    out.trend = prices[1]>prices[0]?'up':prices[1]<prices[0]?'down':'flat';
+  }
+
+  // Days from date range
+  if(dates.length>=2){
+    const ts=dates.map(d=>d.getTime()).sort((a,b)=>a-b);
+    out.days=Math.round((ts[ts.length-1]-ts[0])/(864e5));
+    // Map dates→prices if 1:1
+    if(dates.length===prices.length){
+      const pairs=dates.map((d,i)=>({d,p:prices[i]})).sort((a,b)=>a.d-b.d);
+      out.loDt=pairs.reduce((m,x)=>x.p<m.p?x:m).d;
+      out.hiDt=pairs.reduce((m,x)=>x.p>m.p?x:m).d;
+    }
+  }
+  return out;
+}
+
+function extractPrices(text){
+  // Match standalone decimal numbers; filter years & trivially small integers
+  const re=/(?<!\w)\$?\s*(\d{1,8}(?:,\d{3})*(?:\.\d{1,4})?)(?!\w)/g;
+  const found=[]; let m;
+  while((m=re.exec(text))!==null){
+    const n=parseFloat(m[1].replace(/,/g,''));
+    if(n>0.01 && !(n>=1900&&n<=2100&&!m[1].includes('.'))) found.push(n);
+  }
+  return found;
+}
+
+function extractDates(text){
+  const ds=[];
+  const rules=[
+    {re:/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/g,
+     fn:m=>new Date(`${m[3].length===2?'20'+m[3]:m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`)},
+    {re:/\b(20\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/g,
+     fn:m=>new Date(`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`)},
+    {re:/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+(\d{1,2}),?\s+(20\d{2})\b/gi,
+     fn:m=>new Date(`${m[1]} ${m[2]} ${m[3]}`)},
+    {re:/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+'?(\d{2})\b/gi,
+     fn:m=>new Date(`${m[1]} 01 20${m[2]}`)},
+  ];
+  for(const {re,fn} of rules){
+    let m; while((m=re.exec(text))!==null){
+      const d=fn(m);
+      if(!isNaN(d)&&d.getFullYear()>=1990&&d.getFullYear()<=2035) ds.push(d);
+    }
+  }
+  return ds;
+}
+
+const avg=a=>a.reduce((s,v)=>s+v,0)/a.length;
+
+function fp(n){
+  if(n==null) return '—';
+  return n>=1000?'$'+n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','):'$'+n.toFixed(2);
+}
+function fd(d){ return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—' }
+
+function trendDisp(t){
+  return {up:'↑ UPTREND',down:'↓ DOWNTREND',flat:'→ FLAT','N/A':'N/A'}[t]||'—';
+}
+function trendCls(t){return {up:'up',down:'dn',flat:'flat','N/A':''}[t]||''}
+
+// ── Render Extracted Cards ───────────────────────────────────────
+function renderCards(r,raw){
+  function set(id,v,cls){
+    const el=document.getElementById(id);
+    el.textContent=v; el.className='val '+(cls||'');
+  }
+  set('d-trend',trendDisp(r.trend),trendCls(r.trend));
+  set('d-days',r.days!=null?r.days+' days':'—');
+  set('d-cur',fp(r.cur),'gold');
+  set('d-delta',r.delta!=null?fp(r.delta)+(r.deltaPct?` (+${r.deltaPct.toFixed(1)}%)`:''):'—','up');
+  set('d-lo',fp(r.lo),'dn');
+  document.getElementById('d-lo-dt').textContent=fd(r.loDt);
+  set('d-hi',fp(r.hi),'up');
+  document.getElementById('d-hi-dt').textContent=fd(r.hiDt);
+  document.getElementById('d-raw').textContent=raw.trim()||'No text detected';
+  document.getElementById('result-wrap').style.display='block';
+}
+
+// ── Conditions ───────────────────────────────────────────────────
+document.getElementById('btn-save').addEventListener('click',()=>{
+  const v={
+    trend:document.getElementById('c-trend').value,
+    lo:document.getElementById('c-lo').value,
+    hi:document.getElementById('c-hi').value,
+    cur:document.getElementById('c-cur').value,
+    dlt:document.getElementById('c-dlt').value,
+    dpct:document.getElementById('c-dpct').value,
+    dmin:document.getElementById('c-dmin').value,
+    dmax:document.getElementById('c-dmax').value,
+  };
+  try{localStorage.setItem('ss_cond',JSON.stringify(v))}catch{}
+  const el=document.getElementById('saved-ok');
+  el.style.display='block'; setTimeout(()=>el.style.display='none',2200);
+});
+
+function loadCond(){
+  try{
+    const v=JSON.parse(localStorage.getItem('ss_cond')||'{}');
+    if(v.trend) document.getElementById('c-trend').value=v.trend;
+    ['lo','hi','cur','dlt','dpct','dmin','dmax'].forEach(k=>{
+      if(v[k]) document.getElementById('c-'+k).value=v[k];
+    });
+  }catch{}
+}
+loadCond();
+
+function getCond(){
+  return{
+    trend:document.getElementById('c-trend').value,
+    lo:parseFloat(document.getElementById('c-lo').value)||null,
+    hi:parseFloat(document.getElementById('c-hi').value)||null,
+    cur:parseFloat(document.getElementById('c-cur').value)||null,
+    dlt:parseFloat(document.getElementById('c-dlt').value)||null,
+    dpct:parseFloat(document.getElementById('c-dpct').value)||null,
+    dmin:parseInt(document.getElementById('c-dmin').value)||null,
+    dmax:parseInt(document.getElementById('c-dmax').value)||null,
+  };
+}
+
+// ── Generate Report ──────────────────────────────────────────────
+document.getElementById('btn-gen').addEventListener('click',buildReport);
+
+function buildReport(){
+  if(!analysis) return;
+  const r=analysis, c=getCond();
+  const now=new Date();
+  const dateStr=now.toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+  const timeStr=now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+
+  // Evaluate conditions
+  const checks=[];
+  const chk=(label,pass,actual)=>checks.push({label,pass,actual});
+  if(c.trend!=='any') chk(`Trend = ${c.trend}`, r.trend===c.trend, r.trend);
+  if(c.lo!=null&&r.lo!=null) chk(`Lowest ≥ ${fp(c.lo)}`, r.lo>=c.lo, fp(r.lo));
+  if(c.hi!=null&&r.hi!=null) chk(`Highest ≤ ${fp(c.hi)}`, r.hi<=c.hi, fp(r.hi));
+  if(c.cur!=null&&r.cur!=null) chk(`Current ≥ ${fp(c.cur)}`, r.cur>=c.cur, fp(r.cur));
+  if(c.dlt!=null&&r.delta!=null) chk(`Delta ≥ ${fp(c.dlt)}`, r.delta>=c.dlt, fp(r.delta));
+  if(c.dpct!=null&&r.deltaPct!=null) chk(`Delta% ≥ ${c.dpct}%`, r.deltaPct>=c.dpct, r.deltaPct.toFixed(1)+'%');
+  if(c.dmin!=null&&r.days!=null) chk(`Days ≥ ${c.dmin}`, r.days>=c.dmin, r.days+' days');
+  if(c.dmax!=null&&r.days!=null) chk(`Days ≤ ${c.dmax}`, r.days<=c.dmax, r.days+' days');
+  const allPass=checks.every(x=>x.pass);
+
+  // Render UI
+  document.getElementById('r-dt').textContent=`${dateStr} · ${timeStr}`;
+
+  const rowData=[
+    {k:'TREND',         v:trendDisp(r.trend),  cls:trendCls(r.trend)},
+    {k:'DAYS COVERED',  v:r.days!=null?r.days+' days':'N/A'},
+    {k:'CURRENT PRICE', v:fp(r.cur),            cls:'gold'},
+    {k:'LOWEST',        v:fp(r.lo)+(r.loDt?' · '+fd(r.loDt):''), cls:'dn'},
+    {k:'HIGHEST',       v:fp(r.hi)+(r.hiDt?' · '+fd(r.hiDt):''), cls:'up'},
+    {k:'DELTA (L→H)',   v:r.delta!=null?fp(r.delta)+(r.deltaPct?` +${r.deltaPct.toFixed(1)}%`:''):'N/A', cls:'up'},
+  ];
+  document.getElementById('r-rows').innerHTML=rowData.map(row=>`
+    <div class="r-row">
+      <span class="rk">${row.k}</span>
+      <span class="rv ${row.cls||''}">${row.v}</span>
+    </div>`).join('');
+
+  let condHTML='';
+  if(checks.length){
+    condHTML=`<div class="cond-block ${allPass?'pass':'fail'}">
+      <strong>${allPass?'✓ ALL CONDITIONS MET':'✗ CONDITIONS NOT MET'}</strong><br>
+      ${checks.map(x=>`${x.pass?'✓':'✗'} ${x.label} → ${x.actual}`).join('<br>')}
+    </div>`;
+  }
+  document.getElementById('r-conds').innerHTML=condHTML;
+
+  // Build clipboard text
+  const sep='─'.repeat(34);
+  const lines=[
+    'SCREENSCAN ANALYSIS REPORT',
+    `${dateStr} · ${timeStr}`,sep,
+    `TREND          ${trendDisp(r.trend)}`,
+    `DAYS COVERED   ${r.days!=null?r.days+' days':'N/A'}`,
+    `CURRENT PRICE  ${fp(r.cur)}`,
+    `LOWEST         ${fp(r.lo)}${r.loDt?' ('+fd(r.loDt)+')':''}`,
+    `HIGHEST        ${fp(r.hi)}${r.hiDt?' ('+fd(r.hiDt)+')':''}`,
+    `DELTA (L→H)    ${r.delta!=null?fp(r.delta)+(r.deltaPct?` +${r.deltaPct.toFixed(1)}%`:''):'N/A'}`,
+  ];
+  if(checks.length){
+    lines.push(sep);
+    lines.push(`CONDITIONS: ${allPass?'ALL MET ✓':'FAILED ✗'}`);
+    checks.forEach(x=>lines.push(`${x.pass?'✓':'✗'} ${x.label} → ${x.actual}`));
+  }
+  reportText=lines.join('\n');
+  document.getElementById('btn-copy').dataset.report=reportText;
+
+  document.getElementById('r-empty').style.display='none';
+  document.getElementById('r-out').style.display='block';
+  goTab('rep');
+}
+
+// ── Copy ─────────────────────────────────────────────────────────
+document.getElementById('btn-copy').addEventListener('click',async function(){
+  const txt=this.dataset.report||reportText;
+  if(!txt) return;
+  try{
+    await navigator.clipboard.writeText(txt);
+  }catch{
+    const ta=Object.assign(document.createElement('textarea'),{value:txt,style:'position:fixed;opacity:0'});
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  const el=document.getElementById('copy-ok');
+  el.style.display='block'; setTimeout(()=>el.style.display='none',3000);
+});
+</script>
+</body>
+</html>
